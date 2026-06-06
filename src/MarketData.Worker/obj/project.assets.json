@@ -603,6 +603,43 @@
             "rid": "win"
           }
         }
+      },
+      "MarketData.Application/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v8.0",
+        "dependencies": {
+          "MarketData.Domain": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/MarketData.Application.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/MarketData.Application.dll": {}
+        }
+      },
+      "MarketData.Domain/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v8.0",
+        "compile": {
+          "bin/placeholder/MarketData.Domain.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/MarketData.Domain.dll": {}
+        }
+      },
+      "MarketData.Infrastructure/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v8.0",
+        "dependencies": {
+          "MarketData.Application": "1.0.0",
+          "MarketData.Domain": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/MarketData.Infrastructure.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/MarketData.Infrastructure.dll": {}
+        }
       }
     }
   },
@@ -1535,10 +1572,27 @@
         "system.diagnostics.eventlog.nuspec",
         "useSharedDesignerContext.txt"
       ]
+    },
+    "MarketData.Application/1.0.0": {
+      "type": "project",
+      "path": "../MarketData.Application/MarketData.Application.csproj",
+      "msbuildProject": "../MarketData.Application/MarketData.Application.csproj"
+    },
+    "MarketData.Domain/1.0.0": {
+      "type": "project",
+      "path": "../MarketData.Domain/MarketData.Domain.csproj",
+      "msbuildProject": "../MarketData.Domain/MarketData.Domain.csproj"
+    },
+    "MarketData.Infrastructure/1.0.0": {
+      "type": "project",
+      "path": "../MarketData.Infrastructure/MarketData.Infrastructure.csproj",
+      "msbuildProject": "../MarketData.Infrastructure/MarketData.Infrastructure.csproj"
     }
   },
   "projectFileDependencyGroups": {
     "net8.0": [
+      "MarketData.Application >= 1.0.0",
+      "MarketData.Infrastructure >= 1.0.0",
       "Microsoft.Extensions.Hosting >= 8.0.1"
     ]
   },
@@ -1576,7 +1630,14 @@
         "net8.0": {
           "framework": "net8.0",
           "targetAlias": "net8.0",
-          "projectReferences": {}
+          "projectReferences": {
+            "C:\\Users\\aston\\source\\repos\\MarketData\\MarketData\\src\\MarketData.Application\\MarketData.Application.csproj": {
+              "projectPath": "C:\\Users\\aston\\source\\repos\\MarketData\\MarketData\\src\\MarketData.Application\\MarketData.Application.csproj"
+            },
+            "C:\\Users\\aston\\source\\repos\\MarketData\\MarketData\\src\\MarketData.Infrastructure\\MarketData.Infrastructure.csproj": {
+              "projectPath": "C:\\Users\\aston\\source\\repos\\MarketData\\MarketData\\src\\MarketData.Infrastructure\\MarketData.Infrastructure.csproj"
+            }
+          }
         }
       },
       "warningProperties": {
