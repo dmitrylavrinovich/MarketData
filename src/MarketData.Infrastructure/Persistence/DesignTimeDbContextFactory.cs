@@ -11,8 +11,11 @@ public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<Mar
 {
     public MarketDataDbContext CreateDbContext(string[] args)
     {
+        var connectionString = Environment.GetEnvironmentVariable("MARKETDATA_POSTGRES")
+            ?? "Host=localhost;Database=marketdata;Username=postgres;Password=postgres";
+
         var options = new DbContextOptionsBuilder<MarketDataDbContext>()
-            .UseNpgsql("Host=localhost;Database=marketdata;Username=postgres;Password=postgres")
+            .UseNpgsql(connectionString)
             .Options;
 
         return new MarketDataDbContext(options);
