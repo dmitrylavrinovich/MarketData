@@ -8,8 +8,9 @@ using Microsoft.Extensions.Options;
 namespace MarketData.Infrastructure.Exchange;
 
 /// <summary>
-/// WebSocket-источник на <see cref="ClientWebSocket"/>. Подключается, отдаёт сырые сообщения
-/// и при обрыве переподключается с экспоненциальной задержкой (базовый reconnect; jitter/heartbeat — позже).
+/// WebSocket-источник на <see cref="ClientWebSocket"/>. Подключается, отдаёт сырые сообщения и
+/// при обрыве переподключается с экспоненциальным backoff + jitter. Watchdog принудительно
+/// реконнектит зависшее соединение (нет данных дольше <see cref="ReconnectOptions.IdleTimeoutSeconds"/>).
 /// </summary>
 public sealed class ExchangeWebSocketClient(
     ExchangeConnection connection,
@@ -17,6 +18,7 @@ public sealed class ExchangeWebSocketClient(
     ILogger<ExchangeWebSocketClient> logger) : IExchangeClient
 {
     private const int ReceiveBufferSize = 8 * 1024;
+    private const int CloseHandshakeTimeoutSeconds = 2;
 
     private readonly ReconnectOptions _reconnect = reconnectOptions.Value;
 
@@ -25,7 +27,7 @@ public sealed class ExchangeWebSocketClient(
     public async IAsyncEnumerable<ReadOnlyMemory<byte>> StreamAsync(
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var delayMs = _reconnect.BaseDelayMs;
+        var attempt = 0;
 
         while (!ct.IsCancellationRequested)
         {
@@ -34,20 +36,23 @@ public sealed class ExchangeWebSocketClient(
 
             if (connected)
             {
-                delayMs = _reconnect.BaseDelayMs;
+                attempt = 0;
                 await foreach (var message in ReadMessagesAsync(socket, ct))
                     yield return message;
 
+                await TryCloseAsync(socket);
                 logger.LogInformation("{Exchange}: disconnected", Exchange);
             }
 
             if (ct.IsCancellationRequested)
                 yield break;
 
+            var delayMs = ReconnectBackoff.NextDelayMs(attempt++, _reconnect, Random.Shared);
+            logger.LogWarning(
+                "{Exchange}: reconnecting in {DelayMs} ms (attempt {Attempt})", Exchange, delayMs, attempt);
+
             if (!await DelayAsync(delayMs, ct))
                 yield break;
-
-            delayMs = Math.Min(delayMs * 2, _reconnect.MaxDelayMs);
         }
     }
 
@@ -75,6 +80,9 @@ public sealed class ExchangeWebSocketClient(
         [EnumeratorCancellation] CancellationToken ct)
     {
         var buffer = new byte[ReceiveBufferSize];
+        var idleTimeout = _reconnect.IdleTimeoutSeconds > 0
+            ? TimeSpan.FromSeconds(_reconnect.IdleTimeoutSeconds)
+            : Timeout.InfiniteTimeSpan;
 
         while (socket.State == WebSocketState.Open && !ct.IsCancellationRequested)
         {
@@ -83,7 +91,17 @@ public sealed class ExchangeWebSocketClient(
 
             while (true)
             {
-                var outcome = await ReceiveChunkAsync(socket, buffer, ct);
+                var outcome = await ReceiveChunkAsync(socket, buffer, idleTimeout, ct);
+
+                if (outcome.IsIdle)
+                {
+                    logger.LogWarning(
+                        "{Exchange}: no data for {Timeout}s, forcing reconnect",
+                        Exchange, _reconnect.IdleTimeoutSeconds);
+                    faultedOrClosed = true;
+                    break;
+                }
+
                 if (!outcome.Ok || outcome.MessageType == WebSocketMessageType.Close)
                 {
                     faultedOrClosed = true;
@@ -103,16 +121,41 @@ public sealed class ExchangeWebSocketClient(
     }
 
     private static async Task<ReceiveOutcome> ReceiveChunkAsync(
-        ClientWebSocket socket, byte[] buffer, CancellationToken ct)
+        ClientWebSocket socket, byte[] buffer, TimeSpan idleTimeout, CancellationToken ct)
     {
+        using var idleCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        if (idleTimeout != Timeout.InfiniteTimeSpan)
+            idleCts.CancelAfter(idleTimeout);
+
         try
         {
-            var result = await socket.ReceiveAsync(buffer, ct);
-            return new ReceiveOutcome(true, result.Count, result.MessageType, result.EndOfMessage);
+            var result = await socket.ReceiveAsync(buffer, idleCts.Token);
+            return new ReceiveOutcome(true, result.Count, result.MessageType, result.EndOfMessage, false);
+        }
+        catch (OperationCanceledException) when (idleCts.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            return ReceiveOutcome.Idle;   // watchdog: молчание дольше idleTimeout
         }
         catch (Exception ex) when (ex is WebSocketException or OperationCanceledException)
         {
             return ReceiveOutcome.Failed;
+        }
+    }
+
+    /// <summary>Best-effort close-handshake. Не привязан к <c>ct</c>, чтобы успеть закрыться при shutdown.</summary>
+    private async Task TryCloseAsync(ClientWebSocket socket)
+    {
+        if (socket.State is not (WebSocketState.Open or WebSocketState.CloseReceived))
+            return;
+
+        try
+        {
+            using var closeCts = new CancellationTokenSource(TimeSpan.FromSeconds(CloseHandshakeTimeoutSeconds));
+            await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "client shutdown", closeCts.Token);
+        }
+        catch (Exception ex) when (ex is WebSocketException or OperationCanceledException or ObjectDisposedException)
+        {
+            // Соединение уже разорвано — закрывать нечего.
         }
     }
 
@@ -130,8 +173,9 @@ public sealed class ExchangeWebSocketClient(
     }
 
     private readonly record struct ReceiveOutcome(
-        bool Ok, int Count, WebSocketMessageType MessageType, bool EndOfMessage)
+        bool Ok, int Count, WebSocketMessageType MessageType, bool EndOfMessage, bool IsIdle)
     {
-        public static ReceiveOutcome Failed => new(false, 0, WebSocketMessageType.Close, true);
+        public static ReceiveOutcome Failed => new(false, 0, WebSocketMessageType.Close, true, false);
+        public static ReceiveOutcome Idle => new(false, 0, WebSocketMessageType.Close, true, true);
     }
 }
