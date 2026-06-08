@@ -1,5 +1,6 @@
 using MarketData.Application.Pipeline;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace MarketData.Application;
 
@@ -10,6 +11,9 @@ public static class DependencyInjection
     {
         // Один канал на процесс — общий буфер для всех источников и единственного консьюмера.
         services.AddSingleton<IngestPipeline>();
+
+        // Единственный consumer: батчинг + дедуп + запись в ITickSink.
+        services.AddHostedService<IngestConsumerService>();
 
         return services;
     }

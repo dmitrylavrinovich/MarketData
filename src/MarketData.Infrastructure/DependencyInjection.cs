@@ -1,6 +1,7 @@
 using MarketData.Application.Abstractions;
 using MarketData.Application.Configuration;
 using MarketData.Application.Pipeline;
+using MarketData.Infrastructure.Deduplication;
 using MarketData.Infrastructure.Exchange;
 using MarketData.Infrastructure.Parsing;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,9 @@ public static class DependencyInjection
         services.AddSingleton<ITickParser, CsvTickParser>();
 
         services.AddSingleton<INormalizer, TickNormalizer>();
+
+        // Дедуп — общий на процесс (единственный consumer), потокобезопасен на случай SingleReader=false.
+        services.AddSingleton<IDeduplicator, InMemoryDeduplicator>();
 
         return services;
     }
