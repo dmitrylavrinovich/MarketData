@@ -72,6 +72,31 @@ public class ExchangeIngestServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_NormalizeThrows_SkipsTickAndContinues()
+    {
+        var pipeline = NewPipeline();
+        var messages = new[]
+        {
+            Encoding.UTF8.GetBytes("""{"s":"BADUSDT","p":"1.00","q":"1.0","T":1749225301123}"""),
+            Encoding.UTF8.GetBytes("""{"s":"ETHUSDT","p":"3000.00","q":"0.5","T":1749225302123}"""),
+        };
+        var service = new ExchangeIngestService(
+            new FakeExchangeClient("ExchangeA", messages),
+            [new JsonSnakeTickParser()],
+            new ThrowingNormalizer(failForRawContains: "BAD"),
+            pipeline,
+            NullLogger<ExchangeIngestService>.Instance);
+
+        await service.StartAsync(CancellationToken.None);
+
+        // Первый тик роняет нормализатор — источник не падает, второй валидный доходит.
+        var tick = await ReadWithTimeoutAsync(pipeline);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal("ETH-USDT", tick.Ticker);
+    }
+
+    [Fact]
     public void Ctor_NoMatchingParser_Throws()
     {
         var ex = Assert.Throws<InvalidOperationException>(() => new ExchangeIngestService(
@@ -88,6 +113,19 @@ public class ExchangeIngestServiceTests
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         return await pipeline.Reader.ReadAsync(cts.Token);
+    }
+
+    /// <summary>Нормализует как обычно, но кидает исключение для одного тикера — модель битого тика.</summary>
+    private sealed class ThrowingNormalizer(string failForRawContains) : INormalizer
+    {
+        private readonly TickNormalizer _inner = new();
+
+        public Tick Normalize(Tick raw)
+        {
+            if (raw.Ticker.Contains(failForRawContains, StringComparison.Ordinal))
+                throw new InvalidOperationException($"boom on {raw.Ticker}");
+            return _inner.Normalize(raw);
+        }
     }
 
     private sealed class FakeExchangeClient(string exchange, byte[][] messages) : IExchangeClient

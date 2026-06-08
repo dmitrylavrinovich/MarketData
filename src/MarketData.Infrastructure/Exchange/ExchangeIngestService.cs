@@ -1,5 +1,6 @@
 using MarketData.Application.Abstractions;
 using MarketData.Application.Pipeline;
+using MarketData.Domain.Entities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -49,7 +50,19 @@ public sealed class ExchangeIngestService : BackgroundService
 
                 foreach (var tick in ticks)
                 {
-                    var normalized = _normalizer.Normalize(tick);
+                    Tick normalized;
+                    try
+                    {
+                        normalized = _normalizer.Normalize(tick);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        // Изоляция сбоев: один кривой тик не должен ронять источник (и хост).
+                        failed++;
+                        _logger.LogWarning(ex, "{Exchange}: normalize failed, tick skipped", _client.Exchange);
+                        continue;
+                    }
+
                     await _pipeline.Writer.WriteAsync(normalized, stoppingToken);
                     received++;
                 }
