@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "e4QBBvXk/ng=",
+  "dgSpecHash": "dVbCZo1O5mk=",
   "success": true,
   "projectFilePath": "C:\\Users\\aston\\source\\repos\\MarketData\\MarketData\\src\\MarketData.Application\\MarketData.Application.csproj",
   "expectedPackageFiles": [
@@ -13,15 +13,5 @@
     "C:\\Users\\aston\\.nuget\\packages\\microsoft.extensions.options\\8.0.2\\microsoft.extensions.options.8.0.2.nupkg.sha512",
     "C:\\Users\\aston\\.nuget\\packages\\microsoft.extensions.primitives\\8.0.0\\microsoft.extensions.primitives.8.0.0.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "NU1900",
-      "level": "Warning",
-      "message": "Произошла ошибка при получении данных уязвимости пакета: Не удалось загрузить индекс службы для источника https://nexus.rubius.com/repository/nuget-group/index.json.",
-      "projectPath": "C:\\Users\\aston\\source\\repos\\MarketData\\MarketData\\src\\MarketData.Application\\MarketData.Application.csproj",
-      "warningLevel": 1,
-      "filePath": "C:\\Users\\aston\\source\\repos\\MarketData\\MarketData\\src\\MarketData.Application\\MarketData.Application.csproj",
-      "targetGraphs": []
-    }
-  ]
+  "logs": []
 }

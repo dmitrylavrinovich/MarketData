@@ -4,6 +4,8 @@ using MarketData.Application.Pipeline;
 using MarketData.Infrastructure.Deduplication;
 using MarketData.Infrastructure.Exchange;
 using MarketData.Infrastructure.Parsing;
+using MarketData.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -25,6 +27,23 @@ public static class DependencyInjection
 
         // Дедуп — общий на процесс (единственный consumer), потокобезопасен на случай SingleReader=false.
         services.AddSingleton<IDeduplicator, InMemoryDeduplicator>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Регистрирует запись тиков в PostgreSQL. Контекст — через фабрику (sink живёт как singleton).
+    /// </summary>
+    public static IServiceCollection AddPersistence(this IServiceCollection services, string connectionString)
+    {
+        services.AddDbContextFactory<MarketDataDbContext>(options => options.UseNpgsql(connectionString));
+
+        // --- ITickSink: точка подмены при масштабировании ---
+        // Сейчас (100 тик/сек): EF Core достаточно.
+        services.AddSingleton<ITickSink, EfCoreTickSink>();
+
+        // При росте нагрузки (~50k+ тик/сек): раскомментировать, закомментировать строку выше.
+        // services.AddSingleton<ITickSink, NpgsqlCopyTickSink>();
 
         return services;
     }
