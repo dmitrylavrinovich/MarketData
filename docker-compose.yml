@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: marketdata
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d marketdata"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  migrate:
+    build:
+      context: .
+      dockerfile: src/MarketData.Worker/Dockerfile
+      target: migrate
+    environment:
+      MARKETDATA_POSTGRES: Host=postgres;Database=marketdata;Username=postgres;Password=postgres
+    command:
+      - dotnet
+      - ef
+      - database
+      - update
+      - --project
+      - src/MarketData.Infrastructure
+      - --startup-project
+      - src/MarketData.Infrastructure
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  mock-exchange:
+    build:
+      context: .
+      dockerfile: src/MarketData.MockExchange/Dockerfile
+    ports:
+      - "5095:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  aggregator:
+    build:
+      context: .
+      dockerfile: src/MarketData.Worker/Dockerfile
+      target: runtime
+    environment:
+      # Worker Host читает DOTNET_ENVIRONMENT (не только ASPNETCORE_*).
+      DOTNET_ENVIRONMENT: Docker
+      ASPNETCORE_ENVIRONMENT: Docker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mock-exchange:
+        condition: service_healthy
+    restart: unless-stopped

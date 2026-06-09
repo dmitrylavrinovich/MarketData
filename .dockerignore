@@ -1,0 +1,9 @@
+**/.git
+**/.vs
+**/.cursor
+**/bin
+**/obj
+**/docs
+**/tests
+**/*.user
+**/agent-transcripts
