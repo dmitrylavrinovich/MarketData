@@ -30,4 +30,7 @@ public sealed class IngestPipeline
 
     /// <summary>Точка чтения для консьюмера (единственный batch writer).</summary>
     public ChannelReader<Tick> Reader => _channel.Reader;
+
+    /// <summary>Текущее число тиков в канале (backpressure-индикатор для метрик).</summary>
+    public int Depth => _channel.Reader.Count;
 }

@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using MarketData.Application.Abstractions;
 using MarketData.Application.Configuration;
+using MarketData.Application.Monitoring;
 using MarketData.Application.Pipeline;
 using MarketData.Domain.Entities;
 using MarketData.Infrastructure.Exchange;
@@ -34,6 +35,7 @@ public class ExchangeIngestServiceTests
             [new JsonSnakeTickParser()],
             new TickNormalizer(),
             pipeline,
+            new MarketDataMetrics(),
             NullLogger<ExchangeIngestService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
@@ -61,6 +63,7 @@ public class ExchangeIngestServiceTests
             [new JsonSnakeTickParser()],
             new TickNormalizer(),
             pipeline,
+            new MarketDataMetrics(),
             NullLogger<ExchangeIngestService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
@@ -85,6 +88,7 @@ public class ExchangeIngestServiceTests
             [new JsonSnakeTickParser()],
             new ThrowingNormalizer(failForRawContains: "BAD"),
             pipeline,
+            new MarketDataMetrics(),
             NullLogger<ExchangeIngestService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
@@ -104,6 +108,7 @@ public class ExchangeIngestServiceTests
             [new JsonSnakeTickParser()],
             new TickNormalizer(),
             NewPipeline(),
+            new MarketDataMetrics(),
             NullLogger<ExchangeIngestService>.Instance));
 
         Assert.Contains("ExchangeZ", ex.Message);

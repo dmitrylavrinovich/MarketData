@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Threading.Channels;
 using MarketData.Application.Abstractions;
 using MarketData.Application.Configuration;
+using MarketData.Application.Monitoring;
 using MarketData.Domain.Entities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -17,6 +19,7 @@ public sealed class IngestConsumerService(
     IngestPipeline pipeline,
     IDeduplicator deduplicator,
     ITickSink sink,
+    MarketDataMetrics metrics,
     IOptions<PipelineOptions> options,
     ILogger<IngestConsumerService> logger) : BackgroundService
 {
@@ -89,9 +92,14 @@ public sealed class IngestConsumerService(
     private void Accept(in Tick tick, List<Tick> batch)
     {
         if (deduplicator.IsNew(tick))
+        {
             batch.Add(tick);
+        }
         else
+        {
             _duplicates++;
+            metrics.RecordDuplicate();
+        }
     }
 
     private async Task FlushAsync(List<Tick> batch, CancellationToken ct)
@@ -101,8 +109,12 @@ public sealed class IngestConsumerService(
 
         try
         {
+            var start = Stopwatch.GetTimestamp();
             await sink.WriteBatchAsync(batch, ct);
+            var elapsedMs = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+
             _written += batch.Count;
+            metrics.RecordBatchWritten(batch.Count, elapsedMs);
         }
         catch (Exception ex) when (ct.IsCancellationRequested)
         {

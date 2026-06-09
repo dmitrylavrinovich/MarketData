@@ -1,4 +1,5 @@
 using MarketData.Application.Abstractions;
+using MarketData.Application.Monitoring;
 using MarketData.Application.Pipeline;
 using MarketData.Domain.Entities;
 using Microsoft.Extensions.Hosting;
@@ -16,6 +17,7 @@ public sealed class ExchangeIngestService : BackgroundService
     private readonly ITickParser _parser;
     private readonly INormalizer _normalizer;
     private readonly IngestPipeline _pipeline;
+    private readonly MarketDataMetrics _metrics;
     private readonly ILogger<ExchangeIngestService> _logger;
 
     public ExchangeIngestService(
@@ -23,6 +25,7 @@ public sealed class ExchangeIngestService : BackgroundService
         IEnumerable<ITickParser> parsers,
         INormalizer normalizer,
         IngestPipeline pipeline,
+        MarketDataMetrics metrics,
         ILogger<ExchangeIngestService> logger)
     {
         _client = client;
@@ -30,6 +33,7 @@ public sealed class ExchangeIngestService : BackgroundService
             ?? throw new InvalidOperationException($"No parser registered for exchange '{client.Exchange}'.");
         _normalizer = normalizer;
         _pipeline = pipeline;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -45,6 +49,7 @@ public sealed class ExchangeIngestService : BackgroundService
                 if (!_parser.TryParse(raw.Span, out var ticks))
                 {
                     failed++;
+                    _metrics.RecordParseFailure(_client.Exchange);
                     continue;
                 }
 
@@ -59,12 +64,14 @@ public sealed class ExchangeIngestService : BackgroundService
                     {
                         // Изоляция сбоев: один кривой тик не должен ронять источник (и хост).
                         failed++;
+                        _metrics.RecordParseFailure(_client.Exchange);
                         _logger.LogWarning(ex, "{Exchange}: normalize failed, tick skipped", _client.Exchange);
                         continue;
                     }
 
                     await _pipeline.Writer.WriteAsync(normalized, stoppingToken);
                     received++;
+                    _metrics.RecordReceived(_client.Exchange);
                 }
             }
         }

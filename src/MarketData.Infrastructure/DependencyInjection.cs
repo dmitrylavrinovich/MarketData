@@ -1,5 +1,6 @@
 using MarketData.Application.Abstractions;
 using MarketData.Application.Configuration;
+using MarketData.Application.Monitoring;
 using MarketData.Application.Pipeline;
 using MarketData.Infrastructure.Deduplication;
 using MarketData.Infrastructure.Exchange;
@@ -67,6 +68,7 @@ public static class DependencyInjection
                 sp.GetRequiredService<IEnumerable<ITickParser>>(),
                 sp.GetRequiredService<INormalizer>(),
                 sp.GetRequiredService<IngestPipeline>(),
+                sp.GetRequiredService<MarketDataMetrics>(),
                 sp.GetRequiredService<ILogger<ExchangeIngestService>>()));
         }
 
