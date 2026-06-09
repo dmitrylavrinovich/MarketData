@@ -16,6 +16,7 @@ public sealed class PostgresFixture : IAsyncLifetime
         .WithDatabase("marketdata")
         .WithUsername("postgres")
         .WithPassword("postgres")
+        .WithAutoRemove(true)   // docker --rm: контейнер удаляется при Stop, не только при Dispose
         .Build();
 
     public IDbContextFactory<MarketDataDbContext> ContextFactory { get; private set; } = null!;
@@ -34,7 +35,13 @@ public sealed class PostgresFixture : IAsyncLifetime
         await db.Database.MigrateAsync();
     }
 
-    public async Task DisposeAsync() => await _container.DisposeAsync();
+    public async Task DisposeAsync()
+    {
+        // Явный Stop + Dispose: xUnit вызывает это после коллекции; при прерывании тестов (Ctrl+C)
+        // может не вызваться — тогда WithAutoRemove хотя бы не оставляет stopped-контейнер.
+        await _container.StopAsync();
+        await _container.DisposeAsync();
+    }
 
     /// <summary>Очищает таблицу между тестами (изоляция без пересоздания контейнера).</summary>
     public async Task ResetAsync()
