@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using MarketData.Application.Abstractions;
 using MarketData.Application.Configuration;
+using MarketData.Application.Monitoring;
 using MarketData.Application.Pipeline;
 using MarketData.Domain.Entities;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,7 +22,7 @@ public class IngestConsumerServiceTests
 
     private static IngestConsumerService Create(
         IngestPipeline pipeline, ITickSink sink, IDeduplicator dedup, PipelineOptions opts)
-        => new(pipeline, dedup, sink, Options.Create(opts), NullLogger<IngestConsumerService>.Instance);
+        => new(pipeline, dedup, sink, new MarketDataMetrics(), Options.Create(opts), NullLogger<IngestConsumerService>.Instance);
 
     [Fact]
     public async Task FlushesBatch_WhenBatchSizeReached()

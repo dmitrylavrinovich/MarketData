@@ -24,6 +24,11 @@ builder.Services
     .Bind(builder.Configuration.GetSection(ReconnectOptions.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
+builder.Services
+    .AddOptions<MetricsOptions>()
+    .Bind(builder.Configuration.GetSection(MetricsOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure();
