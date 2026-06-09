@@ -67,7 +67,9 @@ dotnet test
 ```
 
 - **Unit** (`tests/MarketData.UnitTests`) — парсеры, дедуп, батчинг, backoff.
-- **Integration** (`tests/MarketData.IntegrationTests`) — Testcontainers поднимает Postgres **автоматически**; нужен запущенный Docker. Первый прогон ~2 мин (pull образа Timescale).
+- **Integration** (`tests/MarketData.IntegrationTests`) — Testcontainers поднимает Postgres **автоматически**; нужен запущенный Docker. Первый прогон ~2 мин (pull образа Timescale). Контейнер теста удаляется после `dotnet test` (фикстура + `WithAutoRemove`).
+
+> Контейнеры с префиксом `marketdata-*` (aggregator, postgres, mock-exchange) — это **`docker compose`**, не интеграционные тесты. Остановка: `docker compose down`.
 
 ## Архитектура
 
