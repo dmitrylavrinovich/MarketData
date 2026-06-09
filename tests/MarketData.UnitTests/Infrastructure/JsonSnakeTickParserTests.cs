@@ -1,69 +1,78 @@
 using System.Text;
-using MarketData.Domain.Entities;
 using MarketData.Infrastructure.Parsing;
 
 namespace MarketData.UnitTests.Infrastructure;
 
 /// <summary>
-/// Парсер Exchange A (JSON snake): валидные сообщения, битый JSON, отсутствующие поля,
+/// Парсер JSON snake: валидные сообщения, битый JSON, отсутствующие поля,
 /// нечисловые цена/объём, нарушение доменных инвариантов.
 /// </summary>
 public class JsonSnakeTickParserTests
 {
     private readonly JsonSnakeTickParser _parser = new();
+    private const string Exchange = "ExchangeA";
 
     private static ReadOnlySpan<byte> Bytes(string s) => Encoding.UTF8.GetBytes(s);
 
     [Fact]
-    public void Exchange_IsExchangeA() => Assert.Equal("ExchangeA", _parser.Exchange);
+    public void ParserKind_IsJsonSnake() => Assert.Equal(JsonSnakeTickParser.Kind, _parser.ParserKind);
 
-    /// <summary>Корректное сообщение → один тик с распарсенными полями (символ в исходной форме).</summary>
     [Fact]
-    public void TryParse_ValidMessage_ReturnsTick()
+    public void TryParse_ValidMessage_ReturnsTickWithExchangeFromArgument()
     {
         var ok = _parser.TryParse(
-            Bytes("""{"s":"BTCUSDT","p":"64250.50","q":"1.2","T":1749225301123}"""), out var ticks);
+            Bytes("""{"s":"BTCUSDT","p":"64250.50","q":"1.2","T":1749225301123}"""),
+            Exchange,
+            out var ticks);
 
         Assert.True(ok);
         var tick = Assert.Single(ticks);
-        Assert.Equal("ExchangeA", tick.Exchange);
+        Assert.Equal(Exchange, tick.Exchange);
         Assert.Equal("BTCUSDT", tick.Ticker);
         Assert.Equal(64250.50m, tick.Price);
         Assert.Equal(1.2m, tick.Volume);
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1749225301123), tick.Timestamp);
     }
 
-    /// <summary>Битый JSON → false, пустой список.</summary>
+    [Fact]
+    public void TryParse_CustomExchangeName_UsesArgumentNotHardcoded()
+    {
+        var ok = _parser.TryParse(
+            Bytes("""{"s":"BTCUSDT","p":"100","q":"1","T":1749225301123}"""),
+            "MyBinance",
+            out var ticks);
+
+        Assert.True(ok);
+        Assert.Equal("MyBinance", Assert.Single(ticks).Exchange);
+    }
+
     [Theory]
     [InlineData("not json")]
     [InlineData("{\"s\":\"BTCUSDT\",")]
     [InlineData("")]
     public void TryParse_BrokenJson_ReturnsFalse(string raw)
     {
-        Assert.False(_parser.TryParse(Bytes(raw), out var ticks));
+        Assert.False(_parser.TryParse(Bytes(raw), Exchange, out var ticks));
         Assert.Empty(ticks);
     }
 
-    /// <summary>Отсутствует символ → false.</summary>
     [Fact]
     public void TryParse_MissingSymbol_ReturnsFalse()
     {
-        Assert.False(_parser.TryParse(Bytes("""{"p":"100","q":"1","T":1749225301123}"""), out _));
+        Assert.False(_parser.TryParse(Bytes("""{"p":"100","q":"1","T":1749225301123}"""), Exchange, out _));
     }
 
-    /// <summary>Нечисловая цена → false.</summary>
     [Fact]
     public void TryParse_NonNumericPrice_ReturnsFalse()
     {
         Assert.False(_parser.TryParse(
-            Bytes("""{"s":"BTCUSDT","p":"abc","q":"1","T":1749225301123}"""), out _));
+            Bytes("""{"s":"BTCUSDT","p":"abc","q":"1","T":1749225301123}"""), Exchange, out _));
     }
 
-    /// <summary>Нулевая цена нарушает доменный инвариант → false.</summary>
     [Fact]
     public void TryParse_ZeroPrice_ReturnsFalse()
     {
         Assert.False(_parser.TryParse(
-            Bytes("""{"s":"BTCUSDT","p":"0","q":"1","T":1749225301123}"""), out _));
+            Bytes("""{"s":"BTCUSDT","p":"0","q":"1","T":1749225301123}"""), Exchange, out _));
     }
 }

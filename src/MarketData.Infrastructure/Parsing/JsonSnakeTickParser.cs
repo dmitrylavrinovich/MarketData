@@ -8,16 +8,18 @@ using MarketData.Domain.Exceptions;
 namespace MarketData.Infrastructure.Parsing;
 
 /// <summary>
-/// Exchange A (Binance-like): JSON с короткими ключами, цена/объём строками, время — unix ms.
+/// Формат JSON snake_case (Binance-like): короткие ключи, цена/объём строками, время — unix ms.
 /// Пример: <c>{"s":"BTCUSDT","p":"64250.50","q":"1.2","T":1749225301123}</c>
 /// </summary>
 public sealed class JsonSnakeTickParser : ITickParser
 {
+    public const string Kind = "JsonSnake";
+
     private static readonly IReadOnlyList<Tick> Empty = Array.Empty<Tick>();
 
-    public string Exchange => "ExchangeA";
+    public string ParserKind => Kind;
 
-    public bool TryParse(ReadOnlySpan<byte> raw, out IReadOnlyList<Tick> ticks)
+    public bool TryParse(ReadOnlySpan<byte> raw, string exchange, out IReadOnlyList<Tick> ticks)
     {
         ticks = Empty;
 
@@ -35,7 +37,7 @@ public sealed class JsonSnakeTickParser : ITickParser
         try
         {
             var timestamp = DateTimeOffset.FromUnixTimeMilliseconds(dto.UnixMs);
-            ticks = [new Tick(Exchange, dto.Symbol!, price, volume, timestamp, DateTimeOffset.UtcNow)];
+            ticks = [new Tick(exchange, dto.Symbol!, price, volume, timestamp, DateTimeOffset.UtcNow)];
             return true;
         }
         catch (Exception ex) when (ex is InvalidTickException or ArgumentOutOfRangeException)

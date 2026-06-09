@@ -19,7 +19,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
-        // Парсеры — stateless, резолвятся как IEnumerable<ITickParser> и выбираются по Exchange (Strategy).
+        // Парсеры — stateless; при регистрации источника выбираются по ExchangeOptions.Parser (Strategy).
         services.AddSingleton<ITickParser, JsonSnakeTickParser>();
         services.AddSingleton<ITickParser, JsonNestedTickParser>();
         services.AddSingleton<ITickParser, CsvTickParser>();
@@ -60,16 +60,22 @@ public static class DependencyInjection
         {
             var connection = new ExchangeConnection(exchange.Name, exchange.Url);
 
-            services.AddSingleton<IHostedService>(sp => new ExchangeIngestService(
-                new ExchangeWebSocketClient(
-                    connection,
-                    sp.GetRequiredService<IOptions<ReconnectOptions>>(),
-                    sp.GetRequiredService<ILogger<ExchangeWebSocketClient>>()),
-                sp.GetRequiredService<IEnumerable<ITickParser>>(),
-                sp.GetRequiredService<INormalizer>(),
-                sp.GetRequiredService<IngestPipeline>(),
-                sp.GetRequiredService<MarketDataMetrics>(),
-                sp.GetRequiredService<ILogger<ExchangeIngestService>>()));
+            services.AddSingleton<IHostedService>(sp =>
+            {
+                var parser = TickParserSelector.Select(
+                    sp.GetRequiredService<IEnumerable<ITickParser>>(), exchange);
+
+                return new ExchangeIngestService(
+                    new ExchangeWebSocketClient(
+                        connection,
+                        sp.GetRequiredService<IOptions<ReconnectOptions>>(),
+                        sp.GetRequiredService<ILogger<ExchangeWebSocketClient>>()),
+                    parser,
+                    sp.GetRequiredService<INormalizer>(),
+                    sp.GetRequiredService<IngestPipeline>(),
+                    sp.GetRequiredService<MarketDataMetrics>(),
+                    sp.GetRequiredService<ILogger<ExchangeIngestService>>());
+            });
         }
 
         return services;

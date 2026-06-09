@@ -7,7 +7,7 @@ namespace MarketData.Application.Abstractions;
 /// </summary>
 public interface IExchangeClient
 {
-    /// <summary>Имя источника, напр. "ExchangeA". Связывает клиента с <see cref="ITickParser"/> и конфигом.</summary>
+    /// <summary>Имя источника из <c>ExchangeOptions.Name</c>, напр. "ExchangeA". Парсер выбирается по <c>ExchangeOptions.Parser</c>.</summary>
     string Exchange { get; }
 
     /// <summary>

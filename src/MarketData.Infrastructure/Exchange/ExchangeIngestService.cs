@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace MarketData.Infrastructure.Exchange;
 
 /// <summary>
-/// Producer одного источника: читает сырой поток клиента, парсит по формату биржи,
+/// Producer одного источника: читает сырой поток клиента, парсит выбранным по <c>ExchangeOptions.Parser</c> парсером,
 /// нормализует и пишет в канал пайплайна. По одному экземпляру на источник → параллельный приём.
 /// </summary>
 public sealed class ExchangeIngestService : BackgroundService
@@ -22,15 +22,14 @@ public sealed class ExchangeIngestService : BackgroundService
 
     public ExchangeIngestService(
         IExchangeClient client,
-        IEnumerable<ITickParser> parsers,
+        ITickParser parser,
         INormalizer normalizer,
         IngestPipeline pipeline,
         MarketDataMetrics metrics,
         ILogger<ExchangeIngestService> logger)
     {
         _client = client;
-        _parser = parsers.FirstOrDefault(p => p.Exchange == client.Exchange)
-            ?? throw new InvalidOperationException($"No parser registered for exchange '{client.Exchange}'.");
+        _parser = parser;
         _normalizer = normalizer;
         _pipeline = pipeline;
         _metrics = metrics;
@@ -46,7 +45,7 @@ public sealed class ExchangeIngestService : BackgroundService
         {
             await foreach (var raw in _client.StreamAsync(stoppingToken))
             {
-                if (!_parser.TryParse(raw.Span, out var ticks))
+                if (!_parser.TryParse(raw.Span, _client.Exchange, out var ticks))
                 {
                     failed++;
                     _metrics.RecordParseFailure(_client.Exchange);
