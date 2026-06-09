@@ -8,16 +8,18 @@ using MarketData.Domain.Exceptions;
 namespace MarketData.Infrastructure.Parsing;
 
 /// <summary>
-/// Exchange B (Bybit-like): вложенный JSON, цена/объём числами, время — ISO-8601 UTC.
+/// Формат JSON nested (Bybit-like): вложенный объект, цена/объём числами, время — ISO-8601 UTC.
 /// Пример: <c>{"topic":"trade","data":{"symbol":"BTC-USDT","price":64250.5,"size":1.2,"timestamp":"2026-06-06T15:55:01.123Z"}}</c>
 /// </summary>
 public sealed class JsonNestedTickParser : ITickParser
 {
+    public const string Kind = "JsonNested";
+
     private static readonly IReadOnlyList<Tick> Empty = Array.Empty<Tick>();
 
-    public string Exchange => "ExchangeB";
+    public string ParserKind => Kind;
 
-    public bool TryParse(ReadOnlySpan<byte> raw, out IReadOnlyList<Tick> ticks)
+    public bool TryParse(ReadOnlySpan<byte> raw, string exchange, out IReadOnlyList<Tick> ticks)
     {
         ticks = Empty;
 
@@ -37,7 +39,7 @@ public sealed class JsonNestedTickParser : ITickParser
 
         try
         {
-            ticks = [new Tick(Exchange, data.Symbol!, data.Price, data.Size, timestamp, DateTimeOffset.UtcNow)];
+            ticks = [new Tick(exchange, data.Symbol!, data.Price, data.Size, timestamp, DateTimeOffset.UtcNow)];
             return true;
         }
         catch (InvalidTickException)
